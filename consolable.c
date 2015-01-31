@@ -37,11 +37,12 @@
 #include <sys/select.h> // in MacOSX, poll() does not work with devices!!
 #include <dirent.h>
 #include <unistd.h>
+#include <libgen.h>
 
 #ifdef __APPLE__
-#define TTYCLASS "tty.usbmodem"
+#define TTYCLASS "/dev/tty.usb"
 #else
-#define TTYCLASS "ttyACM"
+#define TTYCLASS "/dev/ttyACM"
 #endif
 
 static struct termios orig_terminfo;
@@ -65,7 +66,7 @@ int main(int argc, char **argv)
     struct timeval timeout;
     int maxfd = 1;
     int fdsindex;
-    char *basestring = TTYCLASS;
+    char *basestring = TTYCLASS, *basedir, *basefile;
 
     if (argc == 2)
         basestring = argv[1];
@@ -87,14 +88,16 @@ int main(int argc, char **argv)
     rc = tcsetattr(0, TCSANOW, &terminfo);
 
     printf("consolable: To exit program, type ctrl-Z\n\n");
-    printf("consolable: Waiting for USB device\n");
+    basedir = strdup(dirname(strdup(basestring)));
+    basefile = strdup(basename(strdup(basestring)));
+    printf("consolable: Waiting for USB device %s: %s %s\n", basestring, basedir, basefile);
     while (1) {
         if (fd == -1) {
             struct dirent *direntp;
-            DIR *dirptr = opendir("/dev/");
+            DIR *dirptr = opendir(basedir);
             if (dirptr) {
                 while ((direntp = readdir(dirptr))) {
-                    if (!strncmp(direntp->d_name, basestring, strlen(basestring))) {
+                    if (!strncmp(direntp->d_name, basefile, strlen(basefile))) {
                         sprintf(buf, "/dev/%s", direntp->d_name);
                         fprintf(stderr, "consolable: opening %s\n", buf);
                         fd = open(buf, O_RDWR | O_NONBLOCK);
